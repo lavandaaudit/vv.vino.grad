@@ -4,12 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IBONIRIUM · BALCONY VV13. vino.grad · EXP-06</title>
+    <title>IBONIRIUM · vv13.vino.grad.balcony</title>
     <style>
         :root {
             --neon-blue: #00f2ff;
+            --neon-purple: #bc13fe;
             --neon-green: #39ff14;
-            --bg-deep: #000205;
+            --bg-deep: #000103;
         }
 
         body,
@@ -22,6 +23,9 @@
             color: #fff;
             font-family: 'Courier New', monospace;
             overflow: hidden;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         canvas {
@@ -31,63 +35,94 @@
 
         #hud {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 15px;
+            left: 15px;
             z-index: 100;
-            background: rgba(0, 5, 10, 0.9);
-            border-left: 3px solid var(--neon-blue);
-            padding: 15px;
+            background: rgba(0, 5, 10, 0.95);
+            border-left: 2px solid var(--neon-blue);
+            padding: 12px;
             border-radius: 2px;
             pointer-events: none;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 1);
+            max-width: calc(100% - 30px);
         }
 
         .data-row {
             font-size: 10px;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
             display: flex;
             justify-content: space-between;
-            gap: 40px;
+            gap: 20px;
+            text-transform: uppercase;
         }
 
         .data-row span {
             color: var(--neon-blue);
-            font-weight: bold;
+            font-weight: 700;
         }
 
         .label {
             color: rgba(255, 255, 255, 0.4);
-            text-transform: uppercase;
+        }
+
+        #timer {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 11px;
+            color: #fff;
+            font-weight: bold;
+            text-align: center;
         }
 
         #alert-box {
             margin-top: 10px;
-            padding: 6px;
+            padding: 5px;
             font-size: 9px;
             background: rgba(255, 255, 255, 0.05);
             color: #fff;
             text-align: center;
             letter-spacing: 1px;
-            transition: background 0.3s;
         }
 
         h1 {
-            margin: 0 0 10px 0;
-            font-size: 13px;
+            margin: 0 0 8px 0;
+            font-size: 12px;
             color: var(--neon-green);
             text-transform: uppercase;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 5px;
+            letter-spacing: 2px;
         }
 
         #overlay {
             position: absolute;
-            bottom: 80px;
+            bottom: 85px;
             right: 20px;
             text-align: right;
             font-size: 9px;
             color: rgba(255, 255, 255, 0.2);
             letter-spacing: 1px;
+            pointer-events: none;
+        }
+
+        @media (max-width: 600px) {
+            #hud {
+                padding: 8px;
+                top: 10px;
+                left: 10px;
+            }
+
+            h1 {
+                font-size: 10px;
+            }
+
+            .data-row {
+                font-size: 9px;
+                gap: 10px;
+            }
+
+            #overlay {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -98,15 +133,14 @@
 
     <div id="hud">
         <h1>vv13.vino.grad.balcony</h1>
-        <div class="data-row"><span class="label">Wind Speed</span> <span id="wind">---</span></div>
-        <div class="data-row"><span class="label">Kp Index</span> <span id="storm">---</span></div>
-        <div class="data-row"><span class="label">Proton Flux</span> <span id="proton">---</span></div>
-        <div class="data-row"><span class="label">Electron Flux</span> <span id="electron">---</span></div>
+        <div class="data-row"><span class="label">Wind</span> <span id="wind">---</span></div>
+        <div class="data-row"><span class="label">Kp</span> <span id="storm">---</span></div>
         <div class="data-row"><span class="label">Season</span> <span id="season">---</span></div>
-        <div id="alert-box">ANALYSIS: STABLE</div>
+        <div id="alert-box">ANALYSIS: SYNCING...</div>
+        <div id="timer">T+ 000:00:00:00</div>
     </div>
 
-    <div id="overlay">IBONIRIUM · BALCONY PERSPECTIVE<br>VV13. vino.grad</div>
+    <div id="overlay">IBONIRIUM · FINAL ARCH<br>MISSION ETERNAL SYNC</div>
 
     <script>
         const canvas = document.getElementById('mainCanvas');
@@ -115,262 +149,237 @@
         const bctx = bgCanvas.getContext('2d');
 
         let width, height;
-        let ssn = 0, protonFlux = 0, kpIndex = 0, solarWind = 400, electronFlux = 0;
-        let recentFlare = { class: 'None' };
+        let solarWind = 400, stormLevel = 0.1, kpIndex = 0;
         let alertMode = 'STABLE';
-        let stormLevel = 0.1, radiationLevel = 0.1;
+
+        const missionStart = new Date('2026-01-01T00:00:00');
+
+        const camera = {
+            x: 0, y: 0, zoom: 1, targetZoom: 1,
+            update() {
+                const time = Date.now() * 0.00015;
+                this.targetZoom = 1.0 + Math.sin(time) * 0.3;
+                this.zoom += (this.targetZoom - this.zoom) * 0.004;
+                this.x = (width / 2) * (1 - this.zoom);
+                this.y = (height / 2) * (1 - this.zoom);
+            }
+        };
+
+        function updateTimer() {
+            const now = new Date();
+            const diff = now - missionStart;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+            const mins = Math.floor((diff / (1000 * 60)) % 60);
+            const secs = Math.floor((diff / 1000) % 60);
+            document.getElementById('timer').textContent = `T+ ${days.toString().padStart(3, '0')}:${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
 
         function resize() {
             width = canvas.width = bgCanvas.width = window.innerWidth;
             height = canvas.height = bgCanvas.height = window.innerHeight;
-            drawStaticBackground();
+            drawBackground();
         }
         window.addEventListener('resize', resize);
 
         async function fetchNOAA() {
             try {
-                const [rSSN, rProton, rFlare, rKp, rWind, rElectron] = await Promise.all([
-                    fetch('https://services.swpc.noaa.gov/json/solar-cycle/predicted-solar-cycle.json').then(r => r.json()).catch(() => null),
-                    fetch('https://services.swpc.noaa.gov/json/goes/primary/integral-protons-plot-6-hour.json').then(r => r.json()).catch(() => null),
-                    fetch('https://services.swpc.noaa.gov/json/goes/primary/xray-flares-7-day.json').then(r => r.json()).catch(() => null),
+                const [rKp, rWind] = await Promise.all([
                     fetch('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json').then(r => r.json()).catch(() => null),
-                    fetch('https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json').then(r => r.json()).catch(() => null),
-                    fetch('https://services.swpc.noaa.gov/json/goes/primary/integral-electrons-plot-6-hour.json').then(r => r.json()).catch(() => null)
+                    fetch('https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json').then(r => r.json()).catch(() => null)
                 ]);
-
-                if (rSSN) ssn = rSSN[rSSN.length - 1]?.predicted_ssn || 15;
-                if (rProton) protonFlux = parseFloat(rProton[rProton.length - 1]?.flux) || 1;
                 if (rKp) kpIndex = parseFloat(rKp[rKp.length - 1]?.kp_index) || 0;
                 if (rWind && rWind.length > 0) solarWind = parseFloat(rWind[rWind.length - 1].wind_speed) || 400;
-                if (rElectron) electronFlux = parseFloat(rElectron[rElectron.length - 1]?.flux) || 100;
-                if (rFlare && rFlare.length > 0) recentFlare = { class: rFlare[rFlare.length - 1]?.current_class || 'None' };
 
                 stormLevel = Math.min(1, kpIndex / 9);
-                radiationLevel = Math.min(1, Math.log10(protonFlux + 1) / 4);
-
                 const abox = document.getElementById('alert-box');
-                if (kpIndex >= 6 || radiationLevel > 0.6 || recentFlare.class.startsWith('X')) {
+                if (kpIndex >= 6) {
                     alertMode = 'CRITICAL';
                     abox.style.background = '#f04';
-                } else if (kpIndex >= 4 || radiationLevel > 0.4 || recentFlare.class.startsWith('M')) {
-                    alertMode = 'WARNING';
-                    abox.style.background = '#f80';
                 } else {
                     alertMode = 'STABLE';
                     abox.style.background = 'rgba(255,255,255,0.05)';
                 }
-
                 abox.textContent = `ANALYSIS: ${alertMode}`;
                 document.getElementById('wind').textContent = solarWind.toFixed(0) + ' km/s';
                 document.getElementById('storm').textContent = kpIndex.toFixed(1);
-                document.getElementById('proton').textContent = protonFlux.toFixed(2);
-                document.getElementById('electron').textContent = electronFlux.toFixed(0);
-                drawStaticBackground(); // Redraw with stars
-            } catch (e) { console.warn("NOAA Sync Error"); }
+            } catch (e) { console.warn("Sync Error"); }
         }
-        setInterval(fetchNOAA, 60000); fetchNOAA();
+        setInterval(fetchNOAA, 30000); fetchNOAA();
 
-        function getSeason() {
-            const m = new Date().getMonth();
-            if (m >= 2 && m <= 4) return { name: 'Spring', hue: 120, vitality: 1.0, fruit: 0.1 };
-            if (m >= 5 && m <= 7) return { name: 'Summer', hue: 160, vitality: 1.5, fruit: 0.7 };
-            if (m >= 8 && m <= 10) return { name: 'Autumn', hue: 40, vitality: 0.8, fruit: 1.0 };
-            return { name: 'Winter', hue: 200, vitality: 0.4, fruit: 0 };
+        function getYearProgress() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), 0, 0);
+            const diff = now - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            const dayOfYear = Math.floor(diff / oneDay);
+            const progress = dayOfYear / 365; // 0.0 to 1.0
+
+            // Key Seasonal Points (Day of Year)
+            // 80: Spring Eq, 172: Summer Solstice, 264: Autumn Eq, 355: Winter Solstice
+            const points = [
+                { d: 0, name: 'Winter', hue: 200, vit: 0.3, fruit: 0 },
+                { d: 80, name: 'Spring', hue: 100, vit: 1.2, fruit: 0.1 },
+                { d: 172, name: 'Summer', hue: 160, vit: 1.8, fruit: 0.6 },
+                { d: 264, name: 'Harvest', hue: 40, vit: 1.4, fruit: 1.0 },
+                { d: 355, name: 'Winter', hue: 210, vit: 0.4, fruit: 0 },
+                { d: 366, name: 'Winter', hue: 200, vit: 0.3, fruit: 0 }
+            ];
+
+            // Linear Interpolation
+            let p1 = points[0], p2 = points[points.length - 1];
+            for (let i = 0; i < points.length - 1; i++) {
+                if (dayOfYear >= points[i].d && dayOfYear <= points[i + 1].d) {
+                    p1 = points[i]; p2 = points[i + 1]; break;
+                }
+            }
+
+            const t = (dayOfYear - p1.d) / (p2.d - p1.d);
+            const lerp = (a, b) => a + (b - a) * t;
+
+            return {
+                name: p1.name,
+                day: dayOfYear,
+                hue: lerp(p1.hue, p2.hue),
+                vitality: lerp(p1.vit, p2.vit),
+                fruit: lerp(p1.fruit, p2.fruit)
+            };
         }
 
-        function drawStaticBackground() {
-            // Space Center
-            bctx.fillStyle = '#000205';
+        const stars = Array.from({ length: 250 }, () => ({
+            x: Math.random(), y: Math.random(),
+            s: 0.5 + Math.random() * 1.5,
+            v: 0.00002 + Math.random() * 0.00003
+        }));
+
+        function drawBackground() {
+            bctx.fillStyle = '#000103';
             bctx.fillRect(0, 0, width, height);
-
-            // Stars
             bctx.fillStyle = '#fff';
-            for (let i = 0; i < 200; i++) {
-                const sX = Math.random() * width;
-                const sY = Math.random() * height;
-                const sS = Math.random() * 1.5;
-                bctx.globalAlpha = 0.2 + Math.random() * 0.5;
-                bctx.beginPath();
-                bctx.arc(sX, sY, sS, 0, Math.PI * 2);
-                bctx.fill();
-            }
+            stars.forEach(s => {
+                s.x -= s.v; if (s.x < 0) s.x = 1;
+                bctx.globalAlpha = 0.2 + Math.sin(Date.now() * 0.001 + s.x * 5) * 0.1;
+                bctx.beginPath(); bctx.arc(s.x * width, s.y * height, s.s, 0, Math.PI * 2); bctx.fill();
+            });
             bctx.globalAlpha = 1.0;
-
-            // Balcony Rails (Bottom)
-            const railY = height - 60;
-            bctx.fillStyle = '#0a0a0a';
-            bctx.fillRect(0, railY, width, 60); // Main railing base
-
-            bctx.strokeStyle = '#151515';
-            bctx.lineWidth = 2;
-            for (let i = 0; i < width; i += 40) {
-                bctx.strokeRect(i, railY, 40, 60); // Rail posts
-            }
-            bctx.fillStyle = '#111';
-            bctx.fillRect(0, railY, width, 10); // Handrail top
+            const railY = height - 50;
+            bctx.fillStyle = '#050505'; bctx.fillRect(0, railY, width, 50);
+            bctx.strokeStyle = '#151515'; for (let i = 0; i < width; i += 40) bctx.strokeRect(i, railY, 40, 50);
+            bctx.fillStyle = '#111'; bctx.fillRect(0, railY, width, 5);
         }
 
-        class GeometricLeaf {
+        class FinalContourLeaf {
             constructor(x, y, angle, size) {
                 this.x = x; this.y = y; this.angle = angle; this.size = size;
                 this.phase = Math.random() * Math.PI * 2;
             }
             draw(ctx, color) {
-                const time = Date.now() * 0.001;
-                const sway = Math.sin(time + this.phase) * (solarWind / 2500);
+                const sway = Math.sin(Date.now() * 0.0004 + this.phase) * (solarWind / 5000);
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle + sway);
-
-                if (alertMode === 'CRITICAL' && Math.random() < 0.1) {
-                    ctx.translate((Math.random() - 0.5) * 15, (Math.random() - 0.5) * 15);
-                    ctx.strokeStyle = '#fff';
-                } else {
-                    ctx.strokeStyle = color;
-                }
-
-                ctx.lineWidth = 1;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
                 ctx.beginPath();
-                // Geometric Polygon Leaf
-                for (let i = 0; i < 5; i++) {
-                    const ang = (i / 5) * Math.PI * 2;
-                    const r = (i % 2 === 0) ? this.size : this.size * 0.5;
-                    ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
+                const lobes = 5;
+                for (let i = 0; i <= lobes * 12; i++) {
+                    const ang = (i / (lobes * 12)) * Math.PI * 2;
+                    const r = this.size * (0.85 + Math.sin(ang * lobes) * 0.15 + Math.sin(ang * 40) * 0.02);
+                    ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r * 0.85);
                 }
-                ctx.closePath();
-                ctx.stroke();
+                ctx.closePath(); ctx.stroke();
                 ctx.restore();
             }
         }
 
-        class GeometricGrape {
+        class FinalContourGrape {
             constructor(x, y, count) {
                 this.x = x; this.y = y;
-                this.berries = Array.from({ length: count }, () => ({
-                    ox: (Math.random() - 0.5) * 35,
-                    oy: Math.random() * 50,
-                    r: 3 + Math.random() * 5,
-                    spark: Math.random() * Math.PI * 2
-                }));
+                this.berries = Array.from({ length: count }, () => {
+                    const ang = Math.random() * Math.PI * 2;
+                    const d = Math.random() * 45;
+                    return { ox: Math.cos(ang) * d, oy: Math.sin(ang) * d + d * 0.4, r: 7 + Math.random() * 9 };
+                });
             }
             draw(ctx, color, fruitScale) {
                 if (fruitScale <= 0) return;
-                const time = Date.now() * 0.001;
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                ctx.rotate(Math.sin(time * 0.5) * 0.1 * (solarWind / 1000));
-
+                ctx.save(); ctx.translate(this.x, this.y);
+                ctx.lineWidth = 2.5; // HIGHER CONTRAST
                 this.berries.forEach(b => {
                     const br = b.r * fruitScale;
-                    const gx = b.ox * fruitScale;
-                    const gy = b.oy * fruitScale;
                     ctx.strokeStyle = color;
-                    ctx.beginPath();
-                    ctx.arc(gx, gy, br, 0, Math.PI * 2);
-                    ctx.stroke();
-
-                    const res = Math.max(0, stormLevel * 0.6 + (electronFlux / 6000));
-                    if (res > 0.1) {
-                        ctx.strokeStyle = `hsla(180, 100%, 80%, ${Math.sin(time * 12 + b.spark) * res})`;
-                        ctx.beginPath();
-                        ctx.arc(gx, gy, br * 0.6, 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
+                    ctx.shadowBlur = 10; ctx.shadowColor = color; // GLOW
+                    ctx.beginPath(); ctx.arc(b.ox * fruitScale, b.oy * fruitScale, br, 0, Math.PI * 2); ctx.stroke();
+                    ctx.shadowBlur = 0;
                 });
                 ctx.restore();
             }
         }
 
-        class ArchVine {
-            constructor(startX, startY, type) {
-                this.nodes = [{ x: startX, y: startY, a: type === 'top' ? Math.PI / 2 : (startX < width / 2 ? 0 : Math.PI), l: 0 }];
-                this.type = type; // 'top', 'left', 'right'
-                this.maxNodes = 150 + Math.random() * 100;
-                this.thickness = 1 + Math.random() * 2;
+        class FinalVine {
+            constructor(startX, startY, side) {
+                this.nodes = [{ x: startX, y: startY, a: side === 'top' ? Math.PI / 2 : (side === 'left' ? 0 : Math.PI) }];
+                this.side = side; this.max = 80 + Math.random() * 40;
             }
             grow(season) {
-                if (this.nodes.length >= this.maxNodes * season.vitality) return;
-
-                const parent = this.nodes[Math.floor(Math.random() * this.nodes.length)];
-                let angle = parent.a + (Math.random() - 0.5) * 1.2;
-
-                // Gravity / Center influence logic for Arching
-                if (this.type === 'top') angle += (Math.random() - 0.5) * 0.5; // Hang down
-                else if (this.type === 'left') angle += (0.1 - (parent.x / width)) * 0.5; // Grow inward
-                else if (this.type === 'right') angle += ((parent.x / width) - 0.9) * 0.5; // Grow inward
-
-                const len = 10 + Math.random() * 15;
-                const nx = parent.x + Math.cos(angle) * len;
-                const ny = parent.y + Math.sin(angle) * len;
-
-                // Stop if hitting balcony
-                if (ny > height - 60) return;
-
-                const newNode = { x: nx, y: ny, a: angle, l: len, leaf: null, cluster: null };
-                if (Math.random() < 0.7 * season.vitality) {
-                    newNode.leaf = new GeometricLeaf(nx, ny, angle + Math.PI / 2, 12 + Math.random() * 18);
-                }
-                if (Math.random() < 0.12 * season.fruit) {
-                    newNode.cluster = new GeometricGrape(nx, ny, 8 + Math.floor(Math.random() * 12));
-                }
-
-                parent.child = newNode;
-                this.nodes.push(newNode);
+                if (this.nodes.length >= this.max * season.vitality) return;
+                const p = this.nodes[this.nodes.length - 1];
+                let a = p.a + (Math.random() - 0.5) * 1.5;
+                if (this.side === 'left') a += (0.1 - (p.x / width)) * 0.4;
+                else if (this.side === 'right') a += ((p.x / width) - 0.9) * 0.4;
+                const len = 15 + Math.random() * 25;
+                const nx = p.x + Math.cos(a) * len; const ny = p.y + Math.sin(a) * len;
+                const node = { x: nx, y: ny, a: a, leaf: null, cluster: null };
+                if (Math.random() < 0.6 * season.vitality) node.leaf = new FinalContourLeaf(nx, ny, a + Math.PI / 2, 40 + Math.random() * 50);
+                if (Math.random() < 0.1 * season.fruit) node.cluster = new RealisticContourGrape(nx, ny, 10 + Math.floor(Math.random() * 12));
+                this.nodes.push(node);
             }
             draw(ctx, season) {
-                const time = Date.now() * 0.001;
-                const windBend = (solarWind / 4500);
-
-                let hue = season.hue;
-                if (alertMode === 'CRITICAL') hue = (time * 60) % 360;
-
-                ctx.lineWidth = this.thickness;
-                this.nodes.forEach((node, i) => {
-                    if (!node.child) return;
-                    const shift = Math.sin(time + node.x * 0.01) * windBend * (node.y / height) * 40;
-                    ctx.strokeStyle = `hsla(${hue}, 100%, 50%, 0.7)`;
-                    ctx.beginPath();
-                    ctx.moveTo(node.x + shift, node.y);
-                    ctx.lineTo(node.child.x + shift, node.child.y);
-                    ctx.stroke();
-
-                    if (node.leaf && season.name !== 'Winter') node.leaf.draw(ctx, `hsla(${hue + 40}, 100%, 60%, 0.5)`);
-                    if (node.cluster) node.cluster.draw(ctx, `hsla(${hue + 180}, 100%, 70%, 0.8)`, season.fruit);
+                const time = Date.now() * 0.001; let hue = season.hue;
+                ctx.strokeStyle = `hsla(${hue}, 100%, 55%, 0.8)`; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(this.nodes[0].x, this.nodes[0].y);
+                this.nodes.forEach(n => {
+                    const s = Math.sin(time + n.x * 0.01) * (solarWind / 5000) * (n.y / 10);
+                    ctx.lineTo(n.x + s, n.y);
+                });
+                ctx.stroke();
+                this.nodes.forEach(n => {
+                    if (n.leaf && season.name !== 'Winter') n.leaf.draw(ctx, `hsla(${hue + 30}, 100%, 65%, 0.6)`);
+                    if (n.cluster) {
+                        // High Contrast Grape logic
+                        const grapeHue = season.name === 'Harvest' ? 290 : 120;
+                        const gColor = `hsla(${grapeHue}, 100%, 75%, 1)`;
+                        ctx.lineWidth = 2.5; ctx.shadowBlur = 15; ctx.shadowColor = gColor;
+                        n.cluster.draw(ctx, gColor, season.fruit);
+                        ctx.shadowBlur = 0;
+                    }
                 });
             }
         }
 
-        const systemVines = [];
-        function initSystem() {
-            systemVines.length = 0;
-            // Top beam vines - Much more dense
-            for (let i = 0; i < 25; i++) {
-                systemVines.push(new ArchVine(width * (i / 24), -20, 'top'));
-            }
-            // Side vines - layering them for depth
-            for (let i = 0; i < 15; i++) {
-                systemVines.push(new ArchVine(-20, height * (i / 14), 'left'));
-                systemVines.push(new ArchVine(width + 20, height * (i / 14), 'right'));
+        const vines = [];
+        function initVines() {
+            vines.length = 0;
+            for (let i = 0; i < 20; i++) vines.push(new FinalVine(width * (i / 19), -50, 'top'));
+            for (let i = 0; i < 6; i++) {
+                vines.push(new FinalVine(-50, height * (i / 5), 'left'));
+                vines.push(new FinalVine(width + 50, height * (i / 5), 'right'));
             }
         }
 
         function animate() {
-            const season = getSeason();
-            document.getElementById('season').textContent = season.name;
-            ctx.fillStyle = 'rgba(0, 2, 5, 0.25)';
-            ctx.fillRect(0, 0, width, height);
-
-            systemVines.forEach(v => {
-                // Faster growth for a 'wild' look
-                for (let g = 0; g < 2; g++) v.grow(season);
-                v.draw(ctx, season);
-            });
+            updateTimer();
+            const yearData = getYearProgress();
+            document.getElementById('season').innerHTML = `${yearData.name} <span style="font-size:8px; color:rgba(255,255,255,0.3)">[DAY ${yearData.day}]</span>`;
+            camera.update(); drawBackground();
+            ctx.clearRect(0, 0, width, height);
+            ctx.save(); ctx.translate(camera.x, camera.y); ctx.scale(camera.zoom, camera.zoom);
+            vines.forEach(v => { for (let g = 0; g < 2; g++) v.grow(yearData); v.draw(ctx, yearData); });
+            ctx.restore();
             requestAnimationFrame(animate);
         }
 
-        resize();
-        initSystem();
-        animate();
+        resize(); initVines(); animate();
     </script>
 </body>
 
