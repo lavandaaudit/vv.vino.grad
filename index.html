@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IBONIRIUM · GEOMETRIC GRAPEVINE · EXP-05</title>
+    <title>IBONIRIUM · BALCONY VV13. vino.grad · EXP-06</title>
     <style>
         :root {
             --neon-blue: #00f2ff;
             --neon-green: #39ff14;
-            --bg-deep: #000204;
+            --bg-deep: #000205;
         }
 
         body,
@@ -34,30 +34,12 @@
             top: 20px;
             left: 20px;
             z-index: 100;
-            background: rgba(0, 10, 15, 0.9);
+            background: rgba(0, 5, 10, 0.9);
             border-left: 3px solid var(--neon-blue);
             padding: 15px;
             border-radius: 2px;
             pointer-events: none;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
-            transition: border-color 0.3s;
-        }
-
-        .alert-high {
-            border-left-color: #ff0044 !important;
-            animation: pulse-alert 1s infinite;
-        }
-
-        @keyframes pulse-alert {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.7;
-            }
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
         }
 
         .data-row {
@@ -65,12 +47,12 @@
             margin-bottom: 4px;
             display: flex;
             justify-content: space-between;
-            gap: 30px;
-            font-family: monospace;
+            gap: 40px;
         }
 
         .data-row span {
             color: var(--neon-blue);
+            font-weight: bold;
         }
 
         .label {
@@ -86,16 +68,7 @@
             color: #fff;
             text-align: center;
             letter-spacing: 1px;
-        }
-
-        #overlay {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            text-align: right;
-            font-size: 9px;
-            color: rgba(255, 255, 255, 0.2);
-            letter-spacing: 1px;
+            transition: background 0.3s;
         }
 
         h1 {
@@ -106,32 +79,53 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding-bottom: 5px;
         }
+
+        #overlay {
+            position: absolute;
+            bottom: 80px;
+            right: 20px;
+            text-align: right;
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.2);
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 
 <body>
+    <canvas id="bgCanvas"></canvas>
     <canvas id="mainCanvas"></canvas>
 
     <div id="hud">
-        <h1>Celestial Vine V5</h1>
+        <h1>Celestial Arch V6</h1>
         <div class="data-row"><span class="label">Wind Speed</span> <span id="wind">---</span></div>
         <div class="data-row"><span class="label">Kp Index</span> <span id="storm">---</span></div>
         <div class="data-row"><span class="label">Proton Flux</span> <span id="proton">---</span></div>
         <div class="data-row"><span class="label">Electron Flux</span> <span id="electron">---</span></div>
-        <div class="data-row"><span class="label">Recent Flare</span> <span id="flare">---</span></div>
         <div class="data-row"><span class="label">Season</span> <span id="season">---</span></div>
         <div id="alert-box">ANALYSIS: STABLE</div>
     </div>
 
-    <div id="overlay">IBONIRIUM · GEOMETRIC PROFILE · EXP-05<br>WILD GROWTH CONTOUR</div>
+    <div id="overlay">IBONIRIUM · BALCONY PERSPECTIVE<br>CELESTIAL GRAPEVINE ARCH</div>
 
     <script>
         const canvas = document.getElementById('mainCanvas');
-        const ctx = canvas.getContext('2d', { alpha: false });
+        const bgCanvas = document.getElementById('bgCanvas');
+        const ctx = canvas.getContext('2d');
+        const bctx = bgCanvas.getContext('2d');
+
         let width, height;
         let ssn = 0, protonFlux = 0, kpIndex = 0, solarWind = 400, electronFlux = 0;
         let recentFlare = { class: 'None' };
-        let alertMode = 'STABLE'; // STABLE, ACTIVE, WARNING, CRITICAL
+        let alertMode = 'STABLE';
+        let stormLevel = 0.1, radiationLevel = 0.1;
+
+        function resize() {
+            width = canvas.width = bgCanvas.width = window.innerWidth;
+            height = canvas.height = bgCanvas.height = window.innerHeight;
+            drawStaticBackground();
+        }
+        window.addEventListener('resize', resize);
 
         async function fetchNOAA() {
             try {
@@ -151,75 +145,85 @@
                 if (rElectron) electronFlux = parseFloat(rElectron[rElectron.length - 1]?.flux) || 100;
                 if (rFlare && rFlare.length > 0) recentFlare = { class: rFlare[rFlare.length - 1]?.current_class || 'None' };
 
-                // Processing
                 stormLevel = Math.min(1, kpIndex / 9);
                 radiationLevel = Math.min(1, Math.log10(protonFlux + 1) / 4);
 
-                // Alert System
-                const hud = document.getElementById('hud');
                 const abox = document.getElementById('alert-box');
-
-                if (kpIndex >= 7 || radiationLevel > 0.7 || recentFlare.class.startsWith('X')) {
+                if (kpIndex >= 6 || radiationLevel > 0.6 || recentFlare.class.startsWith('X')) {
                     alertMode = 'CRITICAL';
-                    hud.className = 'alert-high';
                     abox.style.background = '#f04';
                 } else if (kpIndex >= 4 || radiationLevel > 0.4 || recentFlare.class.startsWith('M')) {
                     alertMode = 'WARNING';
-                    hud.className = '';
                     abox.style.background = '#f80';
                 } else {
                     alertMode = 'STABLE';
-                    hud.className = '';
                     abox.style.background = 'rgba(255,255,255,0.05)';
                 }
 
                 abox.textContent = `ANALYSIS: ${alertMode}`;
-
-                // Update UI
                 document.getElementById('wind').textContent = solarWind.toFixed(0) + ' km/s';
                 document.getElementById('storm').textContent = kpIndex.toFixed(1);
                 document.getElementById('proton').textContent = protonFlux.toFixed(2);
                 document.getElementById('electron').textContent = electronFlux.toFixed(0);
-                document.getElementById('flare').textContent = recentFlare.class;
-
-            } catch (e) { console.warn("Sync Error"); }
+                drawStaticBackground(); // Redraw with stars
+            } catch (e) { console.warn("NOAA Sync Error"); }
         }
         setInterval(fetchNOAA, 60000); fetchNOAA();
 
         function getSeason() {
             const m = new Date().getMonth();
             if (m >= 2 && m <= 4) return { name: 'Spring', hue: 120, vitality: 1.0, fruit: 0.1 };
-            if (m >= 5 && m <= 7) return { name: 'Summer', hue: 160, vitality: 1.5, fruit: 0.6 };
+            if (m >= 5 && m <= 7) return { name: 'Summer', hue: 160, vitality: 1.5, fruit: 0.7 };
             if (m >= 8 && m <= 10) return { name: 'Autumn', hue: 40, vitality: 0.8, fruit: 1.0 };
-            return { name: 'Winter', hue: 200, vitality: 0.3, fruit: 0 };
+            return { name: 'Winter', hue: 200, vitality: 0.4, fruit: 0 };
         }
 
-        function resize() {
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
-            ctx.fillStyle = '#000204';
-            ctx.fillRect(0, 0, width, height);
+        function drawStaticBackground() {
+            // Space Center
+            bctx.fillStyle = '#000205';
+            bctx.fillRect(0, 0, width, height);
+
+            // Stars
+            bctx.fillStyle = '#fff';
+            for (let i = 0; i < 200; i++) {
+                const sX = Math.random() * width;
+                const sY = Math.random() * height;
+                const sS = Math.random() * 1.5;
+                bctx.globalAlpha = 0.2 + Math.random() * 0.5;
+                bctx.beginPath();
+                bctx.arc(sX, sY, sS, 0, Math.PI * 2);
+                bctx.fill();
+            }
+            bctx.globalAlpha = 1.0;
+
+            // Balcony Rails (Bottom)
+            const railY = height - 60;
+            bctx.fillStyle = '#0a0a0a';
+            bctx.fillRect(0, railY, width, 60); // Main railing base
+
+            bctx.strokeStyle = '#151515';
+            bctx.lineWidth = 2;
+            for (let i = 0; i < width; i += 40) {
+                bctx.strokeRect(i, railY, 40, 60); // Rail posts
+            }
+            bctx.fillStyle = '#111';
+            bctx.fillRect(0, railY, width, 10); // Handrail top
         }
-        window.addEventListener('resize', resize);
-        resize();
 
         class GeometricLeaf {
             constructor(x, y, angle, size) {
                 this.x = x; this.y = y; this.angle = angle; this.size = size;
                 this.phase = Math.random() * Math.PI * 2;
-                this.sides = 5 + Math.floor(Math.random() * 3);
             }
             draw(ctx, color) {
                 const time = Date.now() * 0.001;
                 const sway = Math.sin(time + this.phase) * (solarWind / 2500);
-
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle + sway);
 
-                // Alert Glitch
                 if (alertMode === 'CRITICAL' && Math.random() < 0.1) {
-                    ctx.translate((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
+                    ctx.translate((Math.random() - 0.5) * 15, (Math.random() - 0.5) * 15);
                     ctx.strokeStyle = '#fff';
                 } else {
                     ctx.strokeStyle = color;
@@ -227,12 +231,11 @@
 
                 ctx.lineWidth = 1;
                 ctx.beginPath();
-                for (let i = 0; i < this.sides; i++) {
-                    const ang = (i / this.sides) * Math.PI * 2;
-                    const r = (i % 2 === 0) ? this.size : this.size * 0.6;
-                    const px = Math.cos(ang) * r;
-                    const py = Math.sin(ang) * r;
-                    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                // Geometric Polygon Leaf
+                for (let i = 0; i < 5; i++) {
+                    const ang = (i / 5) * Math.PI * 2;
+                    const r = (i % 2 === 0) ? this.size : this.size * 0.5;
+                    ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
                 }
                 ctx.closePath();
                 ctx.stroke();
@@ -244,16 +247,15 @@
             constructor(x, y, count) {
                 this.x = x; this.y = y;
                 this.berries = Array.from({ length: count }, () => ({
-                    ox: (Math.random() - 0.5) * 30,
+                    ox: (Math.random() - 0.5) * 35,
                     oy: Math.random() * 50,
-                    r: 4 + Math.random() * 6,
+                    r: 3 + Math.random() * 5,
                     spark: Math.random() * Math.PI * 2
                 }));
             }
             draw(ctx, color, fruitScale) {
                 if (fruitScale <= 0) return;
                 const time = Date.now() * 0.001;
-
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(Math.sin(time * 0.5) * 0.1 * (solarWind / 1000));
@@ -262,18 +264,16 @@
                     const br = b.r * fruitScale;
                     const gx = b.ox * fruitScale;
                     const gy = b.oy * fruitScale;
-
                     ctx.strokeStyle = color;
                     ctx.beginPath();
                     ctx.arc(gx, gy, br, 0, Math.PI * 2);
                     ctx.stroke();
 
-                    // Storm Spark inside berry (Energy resonance)
-                    const resonance = Math.max(0, stormLevel * 0.5 + (electronFlux / 5000));
-                    if (resonance > 0.1) {
-                        ctx.strokeStyle = `hsla(180, 100%, 80%, ${Math.sin(time * 10 + b.spark) * resonance})`;
+                    const res = Math.max(0, stormLevel * 0.6 + (electronFlux / 6000));
+                    if (res > 0.1) {
+                        ctx.strokeStyle = `hsla(180, 100%, 80%, ${Math.sin(time * 12 + b.spark) * res})`;
                         ctx.beginPath();
-                        ctx.arc(gx, gy, br * 0.5, 0, Math.PI * 2);
+                        ctx.arc(gx, gy, br * 0.6, 0, Math.PI * 2);
                         ctx.stroke();
                     }
                 });
@@ -281,74 +281,61 @@
             }
         }
 
-        class GeometricVineNode {
-            constructor(x, y, angle) {
-                this.x = x; this.y = y; this.angle = angle;
-                this.branches = [];
-                this.leaf = null;
-                this.cluster = null;
-            }
-        }
-
-        class ProfileVine {
-            constructor(startX, startY) {
-                this.nodes = [new GeometricVineNode(startX, startY, 0)];
-                this.maxNodes = 200;
-                this.thickness = 1.5;
+        class ArchVine {
+            constructor(startX, startY, type) {
+                this.nodes = [{ x: startX, y: startY, a: type === 'top' ? Math.PI / 2 : (startX < width / 2 ? 0 : Math.PI), l: 0 }];
+                this.type = type; // 'top', 'left', 'right'
+                this.maxNodes = 150 + Math.random() * 100;
+                this.thickness = 1 + Math.random() * 2;
             }
             grow(season) {
                 if (this.nodes.length >= this.maxNodes * season.vitality) return;
 
                 const parent = this.nodes[Math.floor(Math.random() * this.nodes.length)];
-                if (parent.branches.length > 2) return;
+                let angle = parent.a + (Math.random() - 0.5) * 1.2;
 
-                const angle = parent.angle + (Math.random() - 0.5) * 1.8;
-                const len = 10 + Math.random() * 20;
+                // Gravity / Center influence logic for Arching
+                if (this.type === 'top') angle += (Math.random() - 0.5) * 0.5; // Hang down
+                else if (this.type === 'left') angle += (0.1 - (parent.x / width)) * 0.5; // Grow inward
+                else if (this.type === 'right') angle += ((parent.x / width) - 0.9) * 0.5; // Grow inward
+
+                const len = 10 + Math.random() * 15;
                 const nx = parent.x + Math.cos(angle) * len;
                 const ny = parent.y + Math.sin(angle) * len;
 
-                if (nx < -50 || nx > width + 50 || ny < -50 || ny > height + 50) return;
+                // Stop if hitting balcony
+                if (ny > height - 60) return;
 
-                const newNode = new GeometricVineNode(nx, ny, angle);
-                parent.branches.push(newNode);
-                this.nodes.push(newNode);
-
-                if (Math.random() < 0.4 * season.vitality) {
+                const newNode = { x: nx, y: ny, a: angle, l: len, leaf: null, cluster: null };
+                if (Math.random() < 0.7 * season.vitality) {
                     newNode.leaf = new GeometricLeaf(nx, ny, angle + Math.PI / 2, 12 + Math.random() * 18);
                 }
-                if (Math.random() < 0.08 * season.fruit) {
-                    newNode.cluster = new GeometricGrape(nx, ny, 8 + Math.floor(Math.random() * 10));
+                if (Math.random() < 0.12 * season.fruit) {
+                    newNode.cluster = new GeometricGrape(nx, ny, 8 + Math.floor(Math.random() * 12));
                 }
+
+                parent.child = newNode;
+                this.nodes.push(newNode);
             }
             draw(ctx, season) {
                 const time = Date.now() * 0.001;
-                const windBend = (solarWind / 4000);
+                const windBend = (solarWind / 4500);
 
                 let hue = season.hue;
-                if (alertMode === 'CRITICAL') hue = (time * 50) % 360; // Rapid cycle during alerts
-
-                const vineColor = `hsla(${hue}, 100%, 50%, 0.8)`;
-                const leafColor = `hsla(${hue + 40}, 100%, 60%, 0.5)`;
-                const grapeColor = `hsla(${hue + 180}, 100%, 70%, 0.9)`;
+                if (alertMode === 'CRITICAL') hue = (time * 60) % 360;
 
                 ctx.lineWidth = this.thickness;
+                this.nodes.forEach((node, i) => {
+                    if (!node.child) return;
+                    const shift = Math.sin(time + node.x * 0.01) * windBend * (node.y / height) * 40;
+                    ctx.strokeStyle = `hsla(${hue}, 100%, 50%, 0.7)`;
+                    ctx.beginPath();
+                    ctx.moveTo(node.x + shift, node.y);
+                    ctx.lineTo(node.child.x + shift, node.child.y);
+                    ctx.stroke();
 
-                this.nodes.forEach(node => {
-                    node.branches.forEach(child => {
-                        const shift = Math.sin(time + node.x * 0.01) * windBend * (node.y / height) * 30;
-                        ctx.strokeStyle = vineColor;
-                        ctx.beginPath();
-                        ctx.moveTo(node.x + shift, node.y);
-                        ctx.lineTo(child.x + shift, child.y);
-                        ctx.stroke();
-                    });
-
-                    if (node.leaf && season.name !== 'Winter') {
-                        node.leaf.draw(ctx, leafColor);
-                    }
-                    if (node.cluster) {
-                        node.cluster.draw(ctx, grapeColor, season.fruit);
-                    }
+                    if (node.leaf && season.name !== 'Winter') node.leaf.draw(ctx, `hsla(${hue + 40}, 100%, 60%, 0.5)`);
+                    if (node.cluster) node.cluster.draw(ctx, `hsla(${hue + 180}, 100%, 70%, 0.8)`, season.fruit);
                 });
             }
         }
@@ -356,32 +343,32 @@
         const systemVines = [];
         function initSystem() {
             systemVines.length = 0;
-            // Spawn multiple vines from the bottom-left/center for a 'profile' wall crawl
-            for (let i = 0; i < 5; i++) {
-                systemVines.push(new ProfileVine(Math.random() * width * 0.3, height + 10));
+            // Top beam vines - Much more dense
+            for (let i = 0; i < 25; i++) {
+                systemVines.push(new ArchVine(width * (i / 24), -20, 'top'));
             }
-            // And from the top
-            for (let i = 0; i < 3; i++) {
-                systemVines.push(new ProfileVine(Math.random() * width, -10));
+            // Side vines - layering them for depth
+            for (let i = 0; i < 15; i++) {
+                systemVines.push(new ArchVine(-20, height * (i / 14), 'left'));
+                systemVines.push(new ArchVine(width + 20, height * (i / 14), 'right'));
             }
         }
 
         function animate() {
             const season = getSeason();
             document.getElementById('season').textContent = season.name;
-
-            // Clear Frame with slight persistence
-            ctx.fillStyle = 'rgba(0, 2, 4, 0.2)';
+            ctx.fillStyle = 'rgba(0, 2, 5, 0.25)';
             ctx.fillRect(0, 0, width, height);
 
             systemVines.forEach(v => {
-                v.grow(season);
+                // Faster growth for a 'wild' look
+                for (let g = 0; g < 2; g++) v.grow(season);
                 v.draw(ctx, season);
             });
-
             requestAnimationFrame(animate);
         }
 
+        resize();
         initSystem();
         animate();
     </script>
