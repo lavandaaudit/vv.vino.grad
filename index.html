@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBONIRIUM · GEOMETRIC GRAPEVINE · EXP-05</title>
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-green: #39ff14;
+            --bg-deep: #000204;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-deep);
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+
+        canvas {
+            position: absolute;
+            inset: 0;
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 10, 15, 0.9);
+            border-left: 3px solid var(--neon-blue);
+            padding: 15px;
+            border-radius: 2px;
+            pointer-events: none;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+            transition: border-color 0.3s;
+        }
+
+        .alert-high {
+            border-left-color: #ff0044 !important;
+            animation: pulse-alert 1s infinite;
+        }
+
+        @keyframes pulse-alert {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .data-row {
+            font-size: 10px;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+            font-family: monospace;
+        }
+
+        .data-row span {
+            color: var(--neon-blue);
+        }
+
+        .label {
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+        }
+
+        #alert-box {
+            margin-top: 10px;
+            padding: 6px;
+            font-size: 9px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        #overlay {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            text-align: right;
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.2);
+            letter-spacing: 1px;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 13px;
+            color: var(--neon-green);
+            text-transform: uppercase;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="mainCanvas"></canvas>
+
+    <div id="hud">
+        <h1>Celestial Vine V5</h1>
+        <div class="data-row"><span class="label">Wind Speed</span> <span id="wind">---</span></div>
+        <div class="data-row"><span class="label">Kp Index</span> <span id="storm">---</span></div>
+        <div class="data-row"><span class="label">Proton Flux</span> <span id="proton">---</span></div>
+        <div class="data-row"><span class="label">Electron Flux</span> <span id="electron">---</span></div>
+        <div class="data-row"><span class="label">Recent Flare</span> <span id="flare">---</span></div>
+        <div class="data-row"><span class="label">Season</span> <span id="season">---</span></div>
+        <div id="alert-box">ANALYSIS: STABLE</div>
+    </div>
+
+    <div id="overlay">IBONIRIUM · GEOMETRIC PROFILE · EXP-05<br>WILD GROWTH CONTOUR</div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        let width, height;
+        let ssn = 0, protonFlux = 0, kpIndex = 0, solarWind = 400, electronFlux = 0;
+        let recentFlare = { class: 'None' };
+        let alertMode = 'STABLE'; // STABLE, ACTIVE, WARNING, CRITICAL
+
+        async function fetchNOAA() {
+            try {
+                const [rSSN, rProton, rFlare, rKp, rWind, rElectron] = await Promise.all([
+                    fetch('https://services.swpc.noaa.gov/json/solar-cycle/predicted-solar-cycle.json').then(r => r.json()).catch(() => null),
+                    fetch('https://services.swpc.noaa.gov/json/goes/primary/integral-protons-plot-6-hour.json').then(r => r.json()).catch(() => null),
+                    fetch('https://services.swpc.noaa.gov/json/goes/primary/xray-flares-7-day.json').then(r => r.json()).catch(() => null),
+                    fetch('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json').then(r => r.json()).catch(() => null),
+                    fetch('https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json').then(r => r.json()).catch(() => null),
+                    fetch('https://services.swpc.noaa.gov/json/goes/primary/integral-electrons-plot-6-hour.json').then(r => r.json()).catch(() => null)
+                ]);
+
+                if (rSSN) ssn = rSSN[rSSN.length - 1]?.predicted_ssn || 15;
+                if (rProton) protonFlux = parseFloat(rProton[rProton.length - 1]?.flux) || 1;
+                if (rKp) kpIndex = parseFloat(rKp[rKp.length - 1]?.kp_index) || 0;
+                if (rWind && rWind.length > 0) solarWind = parseFloat(rWind[rWind.length - 1].wind_speed) || 400;
+                if (rElectron) electronFlux = parseFloat(rElectron[rElectron.length - 1]?.flux) || 100;
+                if (rFlare && rFlare.length > 0) recentFlare = { class: rFlare[rFlare.length - 1]?.current_class || 'None' };
+
+                // Processing
+                stormLevel = Math.min(1, kpIndex / 9);
+                radiationLevel = Math.min(1, Math.log10(protonFlux + 1) / 4);
+
+                // Alert System
+                const hud = document.getElementById('hud');
+                const abox = document.getElementById('alert-box');
+
+                if (kpIndex >= 7 || radiationLevel > 0.7 || recentFlare.class.startsWith('X')) {
+                    alertMode = 'CRITICAL';
+                    hud.className = 'alert-high';
+                    abox.style.background = '#f04';
+                } else if (kpIndex >= 4 || radiationLevel > 0.4 || recentFlare.class.startsWith('M')) {
+                    alertMode = 'WARNING';
+                    hud.className = '';
+                    abox.style.background = '#f80';
+                } else {
+                    alertMode = 'STABLE';
+                    hud.className = '';
+                    abox.style.background = 'rgba(255,255,255,0.05)';
+                }
+
+                abox.textContent = `ANALYSIS: ${alertMode}`;
+
+                // Update UI
+                document.getElementById('wind').textContent = solarWind.toFixed(0) + ' km/s';
+                document.getElementById('storm').textContent = kpIndex.toFixed(1);
+                document.getElementById('proton').textContent = protonFlux.toFixed(2);
+                document.getElementById('electron').textContent = electronFlux.toFixed(0);
+                document.getElementById('flare').textContent = recentFlare.class;
+
+            } catch (e) { console.warn("Sync Error"); }
+        }
+        setInterval(fetchNOAA, 60000); fetchNOAA();
+
+        function getSeason() {
+            const m = new Date().getMonth();
+            if (m >= 2 && m <= 4) return { name: 'Spring', hue: 120, vitality: 1.0, fruit: 0.1 };
+            if (m >= 5 && m <= 7) return { name: 'Summer', hue: 160, vitality: 1.5, fruit: 0.6 };
+            if (m >= 8 && m <= 10) return { name: 'Autumn', hue: 40, vitality: 0.8, fruit: 1.0 };
+            return { name: 'Winter', hue: 200, vitality: 0.3, fruit: 0 };
+        }
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            ctx.fillStyle = '#000204';
+            ctx.fillRect(0, 0, width, height);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class GeometricLeaf {
+            constructor(x, y, angle, size) {
+                this.x = x; this.y = y; this.angle = angle; this.size = size;
+                this.phase = Math.random() * Math.PI * 2;
+                this.sides = 5 + Math.floor(Math.random() * 3);
+            }
+            draw(ctx, color) {
+                const time = Date.now() * 0.001;
+                const sway = Math.sin(time + this.phase) * (solarWind / 2500);
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle + sway);
+
+                // Alert Glitch
+                if (alertMode === 'CRITICAL' && Math.random() < 0.1) {
+                    ctx.translate((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
+                    ctx.strokeStyle = '#fff';
+                } else {
+                    ctx.strokeStyle = color;
+                }
+
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let i = 0; i < this.sides; i++) {
+                    const ang = (i / this.sides) * Math.PI * 2;
+                    const r = (i % 2 === 0) ? this.size : this.size * 0.6;
+                    const px = Math.cos(ang) * r;
+                    const py = Math.sin(ang) * r;
+                    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        class GeometricGrape {
+            constructor(x, y, count) {
+                this.x = x; this.y = y;
+                this.berries = Array.from({ length: count }, () => ({
+                    ox: (Math.random() - 0.5) * 30,
+                    oy: Math.random() * 50,
+                    r: 4 + Math.random() * 6,
+                    spark: Math.random() * Math.PI * 2
+                }));
+            }
+            draw(ctx, color, fruitScale) {
+                if (fruitScale <= 0) return;
+                const time = Date.now() * 0.001;
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(Math.sin(time * 0.5) * 0.1 * (solarWind / 1000));
+
+                this.berries.forEach(b => {
+                    const br = b.r * fruitScale;
+                    const gx = b.ox * fruitScale;
+                    const gy = b.oy * fruitScale;
+
+                    ctx.strokeStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(gx, gy, br, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Storm Spark inside berry (Energy resonance)
+                    const resonance = Math.max(0, stormLevel * 0.5 + (electronFlux / 5000));
+                    if (resonance > 0.1) {
+                        ctx.strokeStyle = `hsla(180, 100%, 80%, ${Math.sin(time * 10 + b.spark) * resonance})`;
+                        ctx.beginPath();
+                        ctx.arc(gx, gy, br * 0.5, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                });
+                ctx.restore();
+            }
+        }
+
+        class GeometricVineNode {
+            constructor(x, y, angle) {
+                this.x = x; this.y = y; this.angle = angle;
+                this.branches = [];
+                this.leaf = null;
+                this.cluster = null;
+            }
+        }
+
+        class ProfileVine {
+            constructor(startX, startY) {
+                this.nodes = [new GeometricVineNode(startX, startY, 0)];
+                this.maxNodes = 200;
+                this.thickness = 1.5;
+            }
+            grow(season) {
+                if (this.nodes.length >= this.maxNodes * season.vitality) return;
+
+                const parent = this.nodes[Math.floor(Math.random() * this.nodes.length)];
+                if (parent.branches.length > 2) return;
+
+                const angle = parent.angle + (Math.random() - 0.5) * 1.8;
+                const len = 10 + Math.random() * 20;
+                const nx = parent.x + Math.cos(angle) * len;
+                const ny = parent.y + Math.sin(angle) * len;
+
+                if (nx < -50 || nx > width + 50 || ny < -50 || ny > height + 50) return;
+
+                const newNode = new GeometricVineNode(nx, ny, angle);
+                parent.branches.push(newNode);
+                this.nodes.push(newNode);
+
+                if (Math.random() < 0.4 * season.vitality) {
+                    newNode.leaf = new GeometricLeaf(nx, ny, angle + Math.PI / 2, 12 + Math.random() * 18);
+                }
+                if (Math.random() < 0.08 * season.fruit) {
+                    newNode.cluster = new GeometricGrape(nx, ny, 8 + Math.floor(Math.random() * 10));
+                }
+            }
+            draw(ctx, season) {
+                const time = Date.now() * 0.001;
+                const windBend = (solarWind / 4000);
+
+                let hue = season.hue;
+                if (alertMode === 'CRITICAL') hue = (time * 50) % 360; // Rapid cycle during alerts
+
+                const vineColor = `hsla(${hue}, 100%, 50%, 0.8)`;
+                const leafColor = `hsla(${hue + 40}, 100%, 60%, 0.5)`;
+                const grapeColor = `hsla(${hue + 180}, 100%, 70%, 0.9)`;
+
+                ctx.lineWidth = this.thickness;
+
+                this.nodes.forEach(node => {
+                    node.branches.forEach(child => {
+                        const shift = Math.sin(time + node.x * 0.01) * windBend * (node.y / height) * 30;
+                        ctx.strokeStyle = vineColor;
+                        ctx.beginPath();
+                        ctx.moveTo(node.x + shift, node.y);
+                        ctx.lineTo(child.x + shift, child.y);
+                        ctx.stroke();
+                    });
+
+                    if (node.leaf && season.name !== 'Winter') {
+                        node.leaf.draw(ctx, leafColor);
+                    }
+                    if (node.cluster) {
+                        node.cluster.draw(ctx, grapeColor, season.fruit);
+                    }
+                });
+            }
+        }
+
+        const systemVines = [];
+        function initSystem() {
+            systemVines.length = 0;
+            // Spawn multiple vines from the bottom-left/center for a 'profile' wall crawl
+            for (let i = 0; i < 5; i++) {
+                systemVines.push(new ProfileVine(Math.random() * width * 0.3, height + 10));
+            }
+            // And from the top
+            for (let i = 0; i < 3; i++) {
+                systemVines.push(new ProfileVine(Math.random() * width, -10));
+            }
+        }
+
+        function animate() {
+            const season = getSeason();
+            document.getElementById('season').textContent = season.name;
+
+            // Clear Frame with slight persistence
+            ctx.fillStyle = 'rgba(0, 2, 4, 0.2)';
+            ctx.fillRect(0, 0, width, height);
+
+            systemVines.forEach(v => {
+                v.grow(season);
+                v.draw(ctx, season);
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        initSystem();
+        animate();
+    </script>
+</body>
+
+</html>
